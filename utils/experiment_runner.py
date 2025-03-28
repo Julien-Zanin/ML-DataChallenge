@@ -1,0 +1,122 @@
+import pandas as pd
+import numpy as np
+
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+from time import time
+
+from utils.data_registry import DATASETS
+from utils.features import add_features
+from utils.benchmarks import get_models
+
+def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None):
+    """
+    Run an experiment for a specific dataset and model.
+    
+    Parameters:
+    -----------
+    dataset_key : str
+        Key for the dataset in the DATASETS dictionary
+    model_key : str
+        Key for the model in the get_models() dictionary
+    add_feat : bool
+        Whether to add engineered features
+    feature_sets : list of str or None
+        Feature sets to add if add_feat is True
+        
+    Returns:
+    --------
+    dict
+        Results dictionary with metrics
+    """
+ 
+    
+    # Mapping for class labels
+    mapping = {-1: 0, 0: 1, 1: 2}
+    inverse_mapping = {0: -1, 1: 0, 2: 1}
+    
+    # Load datasets
+    start_load_time = time()
+    dataset_info = DATASETS[dataset_key]
+    X_train = pd.read_csv(dataset_info["train"])
+    X_test = pd.read_csv(dataset_info["test"])
+    load_time = time() - start_load_time
+    
+    # Extract labels
+    y_train = X_train["reod"].replace(mapping)
+    y_test = X_test["reod"].replace(mapping)
+    
+    # Extract features
+    feature_cols = [col for col in X_train.columns if col.startswith('r') and col[1:].isdigit()]
+    
+    # Add engineered features if requested
+    if add_feat:
+        X_train = add_features(X_train, feature_sets)
+        X_test = add_features(X_test, feature_sets)
+        
+        # Update feature columns to include engineered features
+        non_feature_cols = ['ID', 'day', 'equity', 'reod']
+        feature_cols = [col for col in X_train.columns if col not in non_feature_cols]
+    
+    # Prepare data
+    X_train_feat = X_train[feature_cols].fillna(0)
+    X_test_feat = X_test[feature_cols].fillna(0)
+    
+    # Get model
+    models = get_models()
+    model_info = models[model_key]
+    model = model_info["model"]
+    
+    # Create pipeline
+    pipeline = Pipeline([
+        ('scaler', StandardScaler()),
+        ('model', model)
+    ])
+    
+    # Train model
+    start_train_time = time()
+    pipeline.fit(X_train_feat, y_train)
+    train_time = time() - start_train_time
+    
+    # Make predictions
+    start_pred_time = time()
+    y_pred = pipeline.predict(X_test_feat)
+    pred_time = time() - start_pred_time
+    
+    # Map predictions back to original labels
+    y_pred_orig = pd.Series(y_pred).replace(inverse_mapping)
+    y_test_orig = y_test.replace(inverse_mapping)
+    
+    # Calculate metrics
+    accuracy = accuracy_score(y_test_orig, y_pred_orig)
+    report = classification_report(y_test_orig, y_pred_orig, output_dict=True)
+    
+    # Store results
+    results = {
+        "dataset": dataset_key,
+        "dataset_description": dataset_info["description"],
+        "model": model_key,
+        "model_description": model_info["description"],
+        "features_added": add_feat,
+        "feature_sets": feature_sets,
+        "accuracy": accuracy,
+        "precision_weighted": report["weighted avg"]["precision"],
+        "recall_weighted": report["weighted avg"]["recall"],
+        "f1_weighted": report["weighted avg"]["f1-score"],
+        "class_-1_precision": report.get("-1", {}).get("precision", 0),
+        "class_0_precision": report.get("0", {}).get("precision", 0),
+        "class_1_precision": report.get("1", {}).get("precision", 0),
+        "class_-1_recall": report.get("-1", {}).get("recall", 0),
+        "class_0_recall": report.get("0", {}).get("recall", 0),
+        "class_1_recall": report.get("1", {}).get("recall", 0),
+        "report": report,
+        "load_time": load_time,
+        "train_time": train_time,
+        "pred_time": pred_time,
+        "total_time": load_time + train_time + pred_time
+    }
+    
+    return results
+    
