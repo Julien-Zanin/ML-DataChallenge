@@ -14,7 +14,45 @@ from utils.benchmarks import get_models
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None):
+def normalize_rendements_by_row(df):
+    """
+    Normalise uniquement les colonnes de rendement par ligne.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Le dataframe contenant les données
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Dataframe avec les rendements normalisés
+    """
+    df_normalized = df.copy(deep=True)
+    
+    # Identifier les colonnes de rendement (r0 à r52)
+    rendement_cols = [col for col in df.columns if col.startswith('r') and col[1:].isdigit()]
+    
+    if rendement_cols:
+        # Extraire le sous-dataframe des rendements
+        rendements = df[rendement_cols]
+        
+        # Calculer moyenne et écart-type par ligne
+        row_means = rendements.mean(axis=1)
+        row_stds = rendements.std(axis=1)
+        
+        # Normaliser les rendements (avec epsilon pour éviter la division par zéro)
+        normalized_rendements = rendements.sub(row_means, axis=0).div(row_stds + 1e-8, axis=0)
+        
+        # Remplacer les NaN par 0
+        normalized_rendements.fillna(0, inplace=True)
+        
+        # Mettre à jour le dataframe original avec les rendements normalisés
+        df_normalized[rendement_cols] = normalized_rendements
+    
+    return df_normalized
+
+def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None, normalize_by_row=False, use_precomputed_features=False):
     """
     Run an experiment for a specific dataset and model.
     
@@ -28,21 +66,33 @@ def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None):
         Whether to add engineered features
     feature_sets : list of str or None
         Feature sets to add if add_feat is True
+    normalize_by_row : bool
+        Whether to normalize rendement features by row
+    use_precomputed_features : bool
+        Whether to use a dataset that already has precomputed features
         
     Returns:
     --------
     dict
         Results dictionary with metrics
     """
- 
-    
     # Mapping for class labels
     mapping = {-1: 0, 0: 1, 1: 2}
     inverse_mapping = {0: -1, 1: 0, 2: 1}
     
+    # Determine actual dataset key
+    actual_key = f"{dataset_key}_features" if use_precomputed_features else dataset_key
+    
+    if actual_key not in DATASETS:
+        if use_precomputed_features:
+            print(f"Dataset avec features préalculées '{actual_key}' introuvable. Utilisation de '{dataset_key}' à la place.")
+            actual_key = dataset_key
+        else:
+            raise ValueError(f"Dataset '{dataset_key}' introuvable dans le registre.")
+    
     # Load datasets
     start_load_time = time()
-    dataset_info = DATASETS[dataset_key]
+    dataset_info = DATASETS[actual_key]
     X_train = pd.read_csv(dataset_info["train"])
     X_test = pd.read_csv(dataset_info["test"])
     load_time = time() - start_load_time
@@ -51,21 +101,38 @@ def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None):
     y_train = X_train["reod"].replace(mapping)
     y_test = X_test["reod"].replace(mapping)
     
-    # Extract features
-    feature_cols = [col for col in X_train.columns if col.startswith('r') and col[1:].isdigit()]
+    # Conserver seulement ID et reod comme colonnes non-features
+    non_feature_cols = ['ID', 'reod']
     
-    # Add engineered features if requested
-    if add_feat:
+    # Add engineered features if requested (and not already precomputed)
+    if add_feat and not use_precomputed_features:
         X_train = add_features(X_train, feature_sets)
         X_test = add_features(X_test, feature_sets)
-        
-        # Update feature columns to include engineered features
-        non_feature_cols = ['ID', 'day', 'equity', 'reod']
-        feature_cols = [col for col in X_train.columns if col not in non_feature_cols]
     
-    # Prepare data
-    X_train_feat = X_train[feature_cols].fillna(0)
-    X_test_feat = X_test[feature_cols].fillna(0)
+    # Extract features (tout sauf ID et reod)
+    feature_cols = [col for col in X_train.columns if col not in non_feature_cols]
+    
+    # Prepare data without fillna yet
+    X_train_feat = X_train[feature_cols]
+    X_test_feat = X_test[feature_cols]
+    
+    # Apply row normalization if requested (only to rendement columns)
+    if normalize_by_row:
+        print("Application de la normalisation par ligne des rendements...")
+        X_train_feat = normalize_rendements_by_row(X_train_feat)
+        X_test_feat = normalize_rendements_by_row(X_test_feat)
+    
+    # Check for missing values
+    train_na_count = X_train_feat.isna().sum().sum()
+    test_na_count = X_test_feat.isna().sum().sum()
+    
+    if train_na_count > 0 or test_na_count > 0:
+        print(f"Attention: Valeurs manquantes détectées - Train: {train_na_count}, Test: {test_na_count}")
+        print("Application de fillna(0)...")
+        X_train_feat = X_train_feat.fillna(0)
+        X_test_feat = X_test_feat.fillna(0)
+    else:
+        print("Aucune valeur manquante détectée.")
     
     # Get model
     models = get_models()
@@ -102,8 +169,9 @@ def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None):
         "dataset_description": dataset_info["description"],
         "model": model_key,
         "model_description": model_info["description"],
-        "features_added": add_feat,
+        "features_added": add_feat or use_precomputed_features,
         "feature_sets": feature_sets,
+        "normalize_by_row": normalize_by_row,
         "accuracy": accuracy,
         "precision_weighted": report["weighted avg"]["precision"],
         "recall_weighted": report["weighted avg"]["recall"],

@@ -30,3 +30,34 @@ DATASETS = {
         "description" : "Données knn imputer puis bfff"
     }
 }
+
+def add_dataset_with_features(dataset_key, train_path, test_path, description):
+    """
+    Ajoute un dataset avec features au registre DATASETS.
+    
+    Parameters:
+    -----------
+    dataset_key : str
+        Clé unique pour le dataset
+    train_path : str
+        Chemin vers le fichier d'entraînement
+    test_path : str
+        Chemin vers le fichier de test
+    description : str
+        Description du dataset
+    
+    Returns:
+    --------
+    bool
+        True si l'ajout a été effectué avec succès, False sinon
+    """
+    if dataset_key in DATASETS:
+        print(f"Avertissement: Le dataset {dataset_key} existe déjà et sera écrasé.")
+    
+    DATASETS[dataset_key] = {
+        "train": train_path,
+        "test": test_path,
+        "description": description
+    }
+    
+    return True

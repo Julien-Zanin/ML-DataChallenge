@@ -428,8 +428,7 @@ def evaluate_feature_sets(dataset_key='raw', model_key='xgboost_baseline'):
     
     return results
 
-
-def analyze_feature_importance(dataset_key='raw', add_features=True, feature_sets=None):
+def analyze_feature_importance(dataset_key='raw', use_precomputed_features=True):
     """
     Analyser l'importance des features avec XGBoost.
     
@@ -437,25 +436,29 @@ def analyze_feature_importance(dataset_key='raw', add_features=True, feature_set
     -----------
     dataset_key : str
         Clé du dataset dans DATASETS
-    add_features : bool
-        Ajouter ou non des features
-    feature_sets : list
-        Ensembles de features à ajouter
+    use_precomputed_features : bool
+        Utiliser le dataset avec features préalculées
     """
     from xgboost import XGBClassifier
     
     try:
+        # Déterminer quelle dataset utiliser
+        actual_key = f"{dataset_key}_with_features" if use_precomputed_features else dataset_key
+        
+        if actual_key not in DATASETS:
+            if use_precomputed_features:
+                print(f"Dataset avec features préalculées '{actual_key}' introuvable. Utilisation de '{dataset_key}' à la place.")
+                actual_key = dataset_key
+            else:
+                raise ValueError(f"Dataset '{dataset_key}' introuvable dans le registre.")
+        
         # Charger le dataset
-        dataset_info = DATASETS[dataset_key]
+        dataset_info = DATASETS[actual_key]
         X_train = pd.read_csv(dataset_info['train'])
         
         # Mapping pour la variable cible
         mapping = {-1: 0, 0: 1, 1: 2}
         y_train = X_train["reod"].replace(mapping)
-        
-        # Ajouter des features si demandé
-        if add_features:
-            X_train = add_features(X_train, feature_sets)
         
         # Extraire les features
         non_feature_cols = ['ID', 'day', 'equity', 'reod']
@@ -494,8 +497,11 @@ def analyze_feature_importance(dataset_key='raw', add_features=True, feature_set
     
     except Exception as e:
         print(f"Erreur lors de l'analyse de l'importance des features: {e}")
+        import traceback
+        traceback.print_exc()  # Affiche la trace complète pour déboguer
         return None, None
-
+    
+    
 def select_best_features(feature_importance, threshold=0.01, max_features=20):
     """
     Sélectionner les meilleures features basées sur leur importance.
