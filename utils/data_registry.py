@@ -19,6 +19,11 @@ DATASETS = {
         "test"  : r"processed_data\X_test_interp.csv",
         "description" : "Données interpolation linéaire puis bffff"
     },
+    "mice" : {
+        "train" : r"processed_data/X_train_mice.csv",
+        "test"  : r"processed_data/X_test_mice.csv",
+        "description" : "Données MICE imputer puis bfff"
+    },
     "knn" : { 
         "train" : r"processed_data/X_train_knn.csv",
         "test"  : r"processed_data/X_test_knn.csv",
