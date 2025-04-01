@@ -1,8 +1,7 @@
-
 import pandas as pd
 import numpy as np
 from utils.data_registry import DATASETS, add_dataset_with_features
-from utils.features import add_features
+from utils.feature_engineering import add_features
 from sklearn.impute import KNNImputer
 
 

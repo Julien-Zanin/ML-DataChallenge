@@ -8,6 +8,8 @@ from sklearn.preprocessing import StandardScaler, RobustScaler, QuantileTransfor
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import cross_val_score
 from tqdm import tqdm  # For progress bars
+
+from matplotlib_venn import venn2, venn3
 # Optional for visualization:
 # from matplotlib_venn import venn2, venn3
 
@@ -531,4 +533,102 @@ def optimize_feature_count(X, y, model_factory, feature_ranking,
         'best_score': best_score,
         'optimal_features': best_result['features'],
         'results': results_df
+    }
+    
+def compare_feature_selection_methods(results_dict, top_n=20):
+    """
+    Compare les résultats de différentes méthodes de sélection de features.
+    
+    Cette fonction analyse les features sélectionnées par différentes méthodes
+    (corrélation, F-value, information mutuelle, etc.) et identifie les
+    chevauchements entre ces méthodes.
+    
+    Parameters:
+    -----------
+    results_dict : dict
+        Dictionnaire contenant les résultats des différentes méthodes de sélection
+    top_n : int
+        Nombre de features à considérer pour chaque méthode
+        
+    Returns:
+    --------
+    dict
+        Dictionnaire contenant les informations de comparaison
+    """
+    methods = list(results_dict.keys())
+    
+    if len(methods) < 2:
+        print("Besoin d'au moins deux méthodes pour faire une comparaison")
+        return None
+    
+    # Créer un DataFrame pour comparer les top features de chaque méthode
+    comparison = pd.DataFrame()
+    
+    for method in methods:
+        # Prendre les top_n features de chaque méthode
+        features = results_dict[method]['selected_features'][:top_n]
+        comparison[method] = pd.Series(features)
+    
+    print(f"Comparaison des top {top_n} features par méthode:")
+    print(comparison)
+    
+    # Trouver les features communes entre toutes les méthodes
+    common_features = set(results_dict[methods[0]]['selected_features'][:top_n])
+    for method in methods[1:]:
+        common_features &= set(results_dict[method]['selected_features'][:top_n])
+    
+    print(f"\nFeatures communes à toutes les méthodes: {len(common_features)}")
+    if common_features:
+        print(sorted(list(common_features)))
+    
+    # Visualiser le recouvrement entre les méthodes avec un diagramme de Venn (si possible)
+    try:
+        from matplotlib_venn import venn2, venn3
+        
+        plt.figure(figsize=(10, 8))
+        if len(methods) == 2:
+            venn2([
+                set(results_dict[methods[0]]['selected_features'][:top_n]),
+                set(results_dict[methods[1]]['selected_features'][:top_n])
+            ], set_labels=methods)
+        elif len(methods) == 3:
+            venn3([
+                set(results_dict[methods[0]]['selected_features'][:top_n]),
+                set(results_dict[methods[1]]['selected_features'][:top_n]),
+                set(results_dict[methods[2]]['selected_features'][:top_n])
+            ], set_labels=methods)
+        else:
+            print("Diagramme de Venn limité à 2 ou 3 ensembles")
+        
+        plt.title(f"Recouvrement des top {top_n} features par méthode")
+        plt.tight_layout()
+        plt.show()
+    except ImportError:
+        print("Package matplotlib_venn non disponible pour le diagramme de Venn")
+    
+    # Calculer les statistiques de recouvrement entre paires de méthodes
+    overlap_stats = {}
+    if len(methods) > 1:
+        for i, method1 in enumerate(methods):
+            for j, method2 in enumerate(methods):
+                if i < j:  # Éviter les duplications
+                    set1 = set(results_dict[method1]['selected_features'][:top_n])
+                    set2 = set(results_dict[method2]['selected_features'][:top_n])
+                    
+                    overlap = set1.intersection(set2)
+                    overlap_percent = len(overlap) / top_n * 100
+                    
+                    key = f"{method1}-{method2}"
+                    overlap_stats[key] = {
+                        'overlap_count': len(overlap),
+                        'overlap_percent': overlap_percent,
+                        'common_features': sorted(list(overlap))
+                    }
+                    
+                    print(f"\nRecouvrement entre {method1} et {method2}: {len(overlap)} features ({overlap_percent:.1f}%)")
+    
+    return {
+        'comparison_df': comparison,
+        'common_features': sorted(list(common_features)),
+        'overlap_stats': overlap_stats
     }

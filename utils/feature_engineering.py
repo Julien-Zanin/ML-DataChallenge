@@ -78,54 +78,65 @@ def add_features(df,features_sets = None):
     
     return result_df
 
-
-
-    methods = list(results_dict.keys())
+def add_financial_features(df):
+    """
+    Ajoute des features financières avancées au dataframe.
+    """
+    result_df = df.copy(deep=True)
     
-    if len(methods) < 2:
-        print("Besoin d'au moins deux méthodes pour faire une comparaison")
-        return
+    # Identifier les colonnes de rendement
+    r_cols = [col for col in df.columns if col.startswith('r') and col[1:].isdigit()]
     
-    # Créer un DataFrame pour comparer les top features de chaque méthode
-    comparison = pd.DataFrame()
+    if len(r_cols) == 0:
+        print("Aucune colonne de rendement trouvée.")
+        return result_df
     
-    for method in methods:
-        # Prendre les top_n features de chaque méthode
-        features = results_dict[method]['selected_features'][:top_n]
-        comparison[method] = pd.Series(features)
+    # 1. Volatilité réalisée (sur différentes fenêtres)
+    for window in [5, 10, 20]:
+        if window < len(r_cols):
+            result_df[f"volatility_{window}"] = result_df[r_cols].apply(
+                lambda row: row.rolling(window=window).std().iloc[-1], axis=1)
     
-    print(f"Comparaison des top {top_n} features par méthode:")
-    print(comparison)
+    # 2. Ratio de Sharpe simplifié (rendement / volatilité)
+    if 'r_mean' in result_df.columns and 'r_std' in result_df.columns:
+        result_df['sharpe_ratio'] = result_df['r_mean'] / (result_df['r_std'] + 1e-8)
     
-    # Trouver les features communes entre toutes les méthodes
-    common_features = set(results_dict[methods[0]]['selected_features'][:top_n])
-    for method in methods[1:]:
-        common_features &= set(results_dict[method]['selected_features'][:top_n])
+    # 3. Skewness (asymétrie de la distribution des rendements)
+    result_df['r_skewness'] = result_df[r_cols].apply(
+        lambda row: row.skew(), axis=1)
     
-    print(f"\nFeatures communes à toutes les méthodes: {len(common_features)}")
-    if common_features:
-        print(sorted(list(common_features)))
+    # 4. Kurtosis (poids des extrêmes dans la distribution)
+    result_df['r_kurtosis'] = result_df[r_cols].apply(
+        lambda row: row.kurtosis(), axis=1)
     
-    # Visualiser le recouvrement entre les méthodes avec un diagramme de Venn (si possible)
-    try:
-        from matplotlib_venn import venn2, venn3
+    # 5. RSI (Relative Strength Index) sur les rendements
+    for window in [5, 14]:
+        if window < len(r_cols):
+            # Convertir en série pour utiliser rolling
+            def calculate_rsi(row, period=window):
+                prices = pd.Series(row.values)
+                deltas = prices.diff()
+                seed = deltas[:period+1]
+                up = seed[seed >= 0].sum() / period
+                down = -seed[seed < 0].sum() / period
+                rs = up / (down + 1e-8)
+                return 100 - (100 / (1 + rs))
+            
+            result_df[f'rsi_{window}'] = result_df[r_cols].apply(calculate_rsi, axis=1)
+    
+    # 6. MACD (Moving Average Convergence Divergence)
+    if len(r_cols) > 26:
+        def calculate_macd(row):
+            prices = pd.Series(row.values)
+            ema12 = prices.ewm(span=12, adjust=False).mean()
+            ema26 = prices.ewm(span=26, adjust=False).mean()
+            macd = ema12 - ema26
+            return macd.iloc[-1]
         
-        plt.figure(figsize=(10, 8))
-        if len(methods) == 2:
-            venn2([
-                set(results_dict[methods[0]]['selected_features'][:top_n]),
-                set(results_dict[methods[1]]['selected_features'][:top_n])
-            ], set_labels=methods)
-        elif len(methods) == 3:
-            venn3([
-                set(results_dict[methods[0]]['selected_features'][:top_n]),
-                set(results_dict[methods[1]]['selected_features'][:top_n]),
-                set(results_dict[methods[2]]['selected_features'][:top_n])
-            ], set_labels=methods)
-        else:
-            print("Diagramme de Venn limité à 2 ou 3 ensembles")
-        
-        plt.title(f"Recouvrement des top {top_n} features par méthode")
-        plt.show()
-    except ImportError:
-        print("Package matplotlib_venn non disponible pour le diagramme de Venn")
+        result_df['macd'] = result_df[r_cols].apply(calculate_macd, axis=1)
+    
+    # 7. Ratio Nombre de rendements positifs / nombre de rendements négatifs
+    if 'r_pos_count' in result_df.columns and 'r_neg_count' in result_df.columns:
+        result_df['pos_neg_ratio'] = result_df['r_pos_count'] / (result_df['r_neg_count'] + 1e-8)
+    
+    return result_df

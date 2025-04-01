@@ -7,13 +7,13 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from time import time
 from utils.data_registry import DATASETS
-from utils.features import add_features
+from utils.feature_engineering import add_features
 from utils.benchmarks import get_models
 # For analyze_feature_importance
 from xgboost import XGBClassifier
 from IPython.display import display
 
-from utils2.data_preprocessing import normalize_rendements_by_row
+from utils.data_preprocessing import normalize_rendements_by_row
 
 def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None, normalize_by_row=False, use_precomputed_features=False,scaler=StandardScaler()):
     """
