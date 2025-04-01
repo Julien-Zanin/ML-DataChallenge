@@ -1,56 +1,19 @@
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-
 from time import time
-
 from utils.data_registry import DATASETS
 from utils.features import add_features
 from utils.benchmarks import get_models
+# For analyze_feature_importance
+from xgboost import XGBClassifier
+from IPython.display import display
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-def normalize_rendements_by_row(df):
-    """
-    Normalise uniquement les colonnes de rendement par ligne.
-    
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        Le dataframe contenant les données
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        Dataframe avec les rendements normalisés
-    """
-    df_normalized = df.copy(deep=True)
-    
-    # Identifier les colonnes de rendement (r0 à r52)
-    rendement_cols = [col for col in df.columns if col.startswith('r') and col[1:].isdigit()]
-    
-    if rendement_cols:
-        # Extraire le sous-dataframe des rendements
-        rendements = df[rendement_cols]
-        
-        # Calculer moyenne et écart-type par ligne
-        row_means = rendements.mean(axis=1)
-        row_stds = rendements.std(axis=1)
-        
-        # Normaliser les rendements (avec epsilon pour éviter la division par zéro)
-        normalized_rendements = rendements.sub(row_means, axis=0).div(row_stds + 1e-8, axis=0)
-        
-        # Remplacer les NaN par 0
-        normalized_rendements.fillna(0, inplace=True)
-        
-        # Mettre à jour le dataframe original avec les rendements normalisés
-        df_normalized[rendement_cols] = normalized_rendements
-    
-    return df_normalized
+from utils2.data_preprocessing import normalize_rendements_by_row
 
 def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None, normalize_by_row=False, use_precomputed_features=False,scaler=StandardScaler()):
     """
@@ -232,7 +195,191 @@ def display_experiment_result(result):
     plt.tight_layout()
     plt.show()
     
-
 def add_result(results_tracker, result):
     """Add a result to the results tracker DataFrame."""
     return pd.concat([results_tracker, pd.DataFrame([result])], ignore_index=True)
+
+def evaluate_feature_sets(dataset_key='raw', model_key='xgboost_baseline'):
+    """
+    Évaluer différents ensembles de features.
+    
+    Parameters:
+    -----------
+    dataset_key : str
+        Clé du dataset dans DATASETS
+    model_key : str
+        Clé du modèle à utiliser
+    """
+    from utils.experiment_runner import run_experiment
+    
+    print(f"\nÉvaluation des ensembles de features sur {dataset_key} avec {model_key}...")
+    
+    # Définir différents ensembles de features
+    feature_sets_to_test = [
+        None,  # Toutes les features
+        ["basic_stats"],  # Statistiques de base
+        ["technical"],  # Indicateurs techniques
+        ["basic_stats", "technical"]  # Combinaison
+    ]
+    
+    results = []
+    
+    # Tester chaque ensemble de features
+    for feature_set in feature_sets_to_test:
+        try:
+            print(f"\nTest avec feature_set = {feature_set}")
+            result = run_experiment(dataset_key=dataset_key, model_key=model_key, 
+                                   add_feat=True, feature_sets=feature_set)
+            
+            set_name = "Toutes" if feature_set is None else ', '.join(feature_set)
+            print(f"Accuracy avec {set_name}: {result['accuracy']:.4f}")
+            
+            results.append({
+                'feature_set': set_name,
+                'accuracy': result['accuracy'],
+                'f1_weighted': result['f1_weighted'],
+                'train_time': result['train_time'],
+                'total_time': result['total_time'],
+                'result': result
+            })
+            
+            # Ajouter également le résultat sans feature engineering pour comparaison
+            if feature_set is None:  # Comparer avec le cas sans features uniquement une fois
+                result_no_feat = run_experiment(dataset_key=dataset_key, model_key=model_key, 
+                                             add_feat=False)
+                print(f"Accuracy sans features: {result_no_feat['accuracy']:.4f}")
+                
+                results.append({
+                    'feature_set': 'Aucune (baseline)',
+                    'accuracy': result_no_feat['accuracy'],
+                    'f1_weighted': result_no_feat['f1_weighted'],
+                    'train_time': result_no_feat['train_time'],
+                    'total_time': result_no_feat['total_time'],
+                    'result': result_no_feat
+                })
+        
+        except Exception as e:
+            print(f"Erreur lors de l'évaluation avec feature_set = {feature_set}: {e}")
+    
+    # Créer un DataFrame des résultats
+    results_df = pd.DataFrame([{
+        'Feature Set': r['feature_set'],
+        'Accuracy': r['accuracy'],
+        'F1 Score': r['f1_weighted'],
+        'Train Time (s)': r['train_time'],
+        'Total Time (s)': r['total_time']
+    } for r in results])
+    
+    # Trier par précision décroissante
+    results_df = results_df.sort_values('Accuracy', ascending=False)
+    
+    # Afficher le tableau des résultats
+    print("\nRésumé des performances avec différents ensembles de features:")
+    display(results_df)
+    
+    # Visualiser les résultats
+    plt.figure(figsize=(12, 6))
+    sns.barplot(x='Feature Set', y='Accuracy', data=results_df)
+    plt.title(f'Impact des différents ensembles de features ({dataset_key}, {model_key})')
+    plt.xlabel('Ensemble de features')
+    plt.ylabel('Accuracy')
+    plt.xticks(rotation=45)
+    plt.grid(True, axis='y')
+    plt.tight_layout()
+    plt.show()
+    
+    # Visualiser le compromis performance/temps
+    plt.figure(figsize=(10, 6))
+    plt.scatter(results_df['Total Time (s)'], results_df['Accuracy'], s=100)
+    
+    # Ajouter des annotations pour chaque point
+    for i, row in results_df.iterrows():
+        plt.annotate(row['Feature Set'], 
+                    (row['Total Time (s)'], row['Accuracy']),
+                    textcoords="offset points",
+                    xytext=(0, 10),
+                    ha='center')
+    
+    plt.title('Compromis performance/temps pour différents ensembles de features')
+    plt.xlabel('Temps total (secondes)')
+    plt.ylabel('Accuracy')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    
+    return results
+
+def analyze_feature_importance(dataset_key='raw', use_precomputed_features=True):
+    """
+    Analyser l'importance des features avec XGBoost.
+    
+    Parameters:
+    -----------
+    dataset_key : str
+        Clé du dataset dans DATASETS
+    use_precomputed_features : bool
+        Utiliser le dataset avec features préalculées
+    """
+    from xgboost import XGBClassifier
+    
+    try:
+        # Déterminer quelle dataset utiliser
+        actual_key = f"{dataset_key}_with_features" if use_precomputed_features else dataset_key
+        
+        if actual_key not in DATASETS:
+            if use_precomputed_features:
+                print(f"Dataset avec features préalculées '{actual_key}' introuvable. Utilisation de '{dataset_key}' à la place.")
+                actual_key = dataset_key
+            else:
+                raise ValueError(f"Dataset '{dataset_key}' introuvable dans le registre.")
+        
+        # Charger le dataset
+        dataset_info = DATASETS[actual_key]
+        X_train = pd.read_csv(dataset_info['train'])
+        
+        # Mapping pour la variable cible
+        mapping = {-1: 0, 0: 1, 1: 2}
+        y_train = X_train["reod"].replace(mapping)
+        
+        # Extraire les features
+        non_feature_cols = ['ID', 'day', 'equity', 'reod']
+        feature_cols = [col for col in X_train.columns if col not in non_feature_cols]
+        
+        X_features = X_train[feature_cols].fillna(0)
+        
+        # Entraîner un modèle XGBoost
+        model = XGBClassifier(objective='multi:softmax', num_class=3, random_state=42)
+        model.fit(X_features, y_train)
+        
+        # Récupérer l'importance des features
+        importance = model.feature_importances_
+        
+        # Créer un DataFrame pour visualisation
+        importance_df = pd.DataFrame({
+            'Feature': feature_cols,
+            'Importance': importance
+        }).sort_values('Importance', ascending=False)
+        
+        # Visualiser les 20 features les plus importantes
+        plt.figure(figsize=(12, 8))
+        sns.barplot(x='Importance', y='Feature', data=importance_df.head(20))
+        plt.title('Top 20 des features les plus importantes selon XGBoost')
+        plt.xlabel('Importance')
+        plt.ylabel('Feature')
+        plt.grid(True, axis='x')
+        plt.tight_layout()
+        plt.show()
+        
+        # Afficher les résultats
+        print("\nTop 20 des features les plus importantes:")
+        display(importance_df.head(20))
+        
+        return importance_df, model
+    
+    except Exception as e:
+        print(f"Erreur lors de l'analyse de l'importance des features: {e}")
+        import traceback
+        traceback.print_exc()  # Affiche la trace complète pour déboguer
+        return None, None
+    
+    
