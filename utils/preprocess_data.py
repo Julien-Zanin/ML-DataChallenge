@@ -7,7 +7,7 @@ def precompute_datasets_with_features():
     """
     Précompute et sauvegarde les datasets avec features ajoutées.
     """
-    for dataset_key in ['raw', 'ffbf', 'bfff', 'interp', 'mice']:
+    for dataset_key in ['raw', 'ffbf', 'bfff', 'interp', 'knn', 'mice']:
         if dataset_key in DATASETS:
             try:
                 print(f"\nTraitement du dataset {dataset_key}...")
@@ -27,8 +27,8 @@ def precompute_datasets_with_features():
                 X_test_with_features = add_features(X_test)
                 
                 # Sauvegarder
-                output_train_path = f"processed_data/X_train_{dataset_key}_with_features.csv"
-                output_test_path = f"processed_data/X_test_{dataset_key}_with_features.csv"
+                output_train_path = f"processed_data/preprocessed/X_train_{dataset_key}_with_features.csv"
+                output_test_path = f"processed_data/preprocessed/X_test_{dataset_key}_with_features.csv"
                 
                 X_train_with_features.to_csv(output_train_path, index=False)
                 X_test_with_features.to_csv(output_test_path, index=False)

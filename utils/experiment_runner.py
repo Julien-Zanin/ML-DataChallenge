@@ -52,7 +52,7 @@ def normalize_rendements_by_row(df):
     
     return df_normalized
 
-def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None, normalize_by_row=False, use_precomputed_features=False):
+def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None, normalize_by_row=False, use_precomputed_features=False,scaler=StandardScaler()):
     """
     Run an experiment for a specific dataset and model.
     
@@ -141,7 +141,7 @@ def run_experiment(dataset_key, model_key, add_feat=True, feature_sets=None, nor
     
     # Create pipeline
     pipeline = Pipeline([
-        ('scaler', StandardScaler()),
+        ('scaler', scaler),
         ('model', model)
     ])
     

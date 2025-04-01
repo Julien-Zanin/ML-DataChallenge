@@ -28,6 +28,36 @@ DATASETS = {
         "train" : r"processed_data/X_train_knn.csv",
         "test"  : r"processed_data/X_test_knn.csv",
         "description" : "Données knn imputer puis bfff"
+    },
+    "raw_with_features" : {
+        "train" : r"processed_data\preprocessed\X_train_raw_with_features.csv",
+        "test"  : r"processed_data\preprocessed\X_test_raw_with_features.csv",
+        "description" : "Données brutes avec features"
+    },
+    "ffbf_with_features" : {
+        "train" : r"processed_data\preprocessed\X_train_ffbf_with_features.csv",
+        "test"  : r"processed_data\preprocessed\X_test_ffbf_with_features.csv",
+        "description" : "Données forward filled puis backward avec features"
+    },
+    "bfff_with_features" : {
+        "train" : r"processed_data\preprocessed\X_train_bfff_with_features.csv",
+        "test"  : r"processed_data\preprocessed\X_test_bfff_with_features.csv",
+        "description" : "Données backward filled puis forward avec features"
+    },
+    "interp_with_features" : {
+        "train" : r"processed_data\preprocessed\X_train_interp_with_features.csv",
+        "test"  : r"processed_data\preprocessed\X_test_interp_with_features.csv",
+        "description" : "Données interpolation linéaire puis bffff avec features"
+    },
+    "mice_with_features" : {
+        "train" : r"processed_data\preprocessed\X_train_mice_with_features.csv",
+        "test"  : r"processed_data\preprocessed\X_test_mice_with_features.csv",
+        "description" : "Données MICE imputer puis bfff avec features"
+    },
+    "knn_with_features" : { 
+        "train" : r"processed_data\preprocessed\X_train_knn_with_features.csv",
+        "test"  : r"processed_data\preprocessed\X_test_knn_with_features.csv",
+        "description" : "Données knn imputer puis bfff avec features"
     }
 }
 

@@ -56,81 +56,7 @@ def visualize_results(results_df):
     plt.close('all')
 
 
-def analyze_distributions(datasets, selected_cols=None):
-    """
-    Analyse les distributions des rendements pour différentes stratégies d'imputation.
-    
-    Parameters:
-    -----------
-    datasets : dict
-        Dictionnaire contenant les datasets
-    selected_cols : list
-        Liste des colonnes à analyser (si None, sélectionne quelques colonnes représentatives)
-    """
-    if not datasets:
-        print("Aucun dataset à analyser.")
-        return
-    
-    # Sélectionner quelques colonnes représentatives si non spécifiées
-    if selected_cols is None:
-        selected_cols = ['r0', 'r10', 'r25', 'r40', 'r52']
-    
-    # Comparer les distributions pour chaque colonne sélectionnée
-    for col in selected_cols:
-        plt.figure(figsize=(15, 10))
-        
-        # Créer un subplot par stratégie d'imputation
-        n_strategies = len(datasets)
-        rows = (n_strategies + 1) // 2  # Arrondir vers le haut
-        cols = 2 if n_strategies > 1 else 1
-        
-        for i, (strategy, data) in enumerate(datasets.items()):
-            plt.subplot(rows, cols, i+1)
-            
-            if col in data['train'].columns:
-                # Filtrer les valeurs aberrantes pour une meilleure visualisation
-                values = data['train'][col].dropna()
-                
-                # Calculer les limites pour filtrer les valeurs extrêmes
-                q1, q3 = values.quantile([0.01, 0.99])
-                iqr = q3 - q1
-                lower_bound = q1 - 1.5 * iqr
-                upper_bound = q3 + 1.5 * iqr
-                
-                # Filtrer pour l'affichage (mais conserver les stats originales)
-                filtered_values = values[(values >= lower_bound) & (values <= upper_bound)]
-                
-                # Tracer l'histogramme avec KDE
-                sns.histplot(filtered_values, kde=True, bins=50)
-                
-                # Ajouter des informations statistiques
-                mean_val = values.mean()
-                median_val = values.median()
-                std_val = values.std()
-                missing = values.isna().sum() / len(data['train']) * 100
-                
-                plt.axvline(x=mean_val, color='r', linestyle='--', label=f'Moyenne: {mean_val:.2f}')
-                plt.axvline(x=median_val, color='g', linestyle='--', label=f'Médiane: {median_val:.2f}')
-                
-                plt.title(f'{col} - {strategy} ({data["description"]})')
-                plt.xlabel('Rendement (points de base)')
-                plt.ylabel('Fréquence')
-                plt.legend()
-                
-                # Ajouter des statistiques sur le graphique
-                textstr = f'Mean: {mean_val:.2f}\nMedian: {median_val:.2f}\nStd: {std_val:.2f}\nMissing: {missing:.2f}%'
-                props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-                plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=9,
-                        verticalalignment='top', bbox=props)
-            else:
-                plt.text(0.5, 0.5, f"La colonne {col} n'existe pas dans ce dataset",
-                        horizontalalignment='center', verticalalignment='center')
-        
-        plt.tight_layout()
-        plt.show()
-        
-
-def compare_column_stats(datasets):
+def compare_column_stats(datasets,rend_cols=None):
     """
     Compare les statistiques des colonnes entre les différentes stratégies d'imputation.
     """
@@ -179,7 +105,11 @@ def compare_column_stats(datasets):
     plt.figure(figsize=(14, 7))
     
     # Sélectionner quelques colonnes représentatives
-    sample_cols = ['r0', 'r10', 'r25', 'r40', 'r52']
+    if rend_cols is not None : 
+        sample_cols = ['r0', 'r10', 'r25', 'r40', 'r52']
+    else : 
+        sample_cols = rend_cols
+        
     sample_pivot_mean = pivot_mean.loc[sample_cols]
     
     # Créer un heatmap pour visualiser les différences de moyenne
