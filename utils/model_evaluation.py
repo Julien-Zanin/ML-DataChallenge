@@ -7,7 +7,7 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from IPython.display import display
 
-def optimize_hyperparameters(model, param_grid, X_train, y_train, cv=5, n_iter=20, 
+def optimize_hyperparameters(model, param_grid, X_train, y_train, cv=4, n_iter=15, 
                             scoring='accuracy', use_random=True, verbose=1):
     """
     Optimise les hyperparamètres d'un modèle avec GridSearch ou RandomizedSearch.

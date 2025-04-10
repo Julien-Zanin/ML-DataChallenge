@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from time import time
+from utils.feature_engineering import add_financial_features
 
 def load_datasets(strategies=['raw', 'ffbf', 'bfff', 'interp', 'mice',"knn"]):
     """
@@ -134,7 +136,7 @@ def load_dataset_without_day_id(dataset_key, normalize=False):
     X_train_full, y_train, X_test_full, y_test = load_dataset_for_analysis(dataset_key, normalize)
     
     # Retirer day et ID
-    cols_to_remove = ['day', 'ID']
+    cols_to_remove = ['day', 'equity']
     X_train = X_train_full.drop(columns=[col for col in cols_to_remove if col in X_train_full.columns])
     X_test = X_test_full.drop(columns=[col for col in cols_to_remove if col in X_test_full.columns])
     
@@ -174,8 +176,8 @@ def select_financial_and_rendements(X_train, X_test):
     # Sélectionner les colonnes qui existent effectivement dans le DataFrame
     financial_features = [f for f in financial_features if f in X_train.columns]
     
-    # Colonnes à retirer (ID et day)
-    cols_to_remove = ['ID', 'day']
+    # Colonnes à retirer (ID et equity)
+    cols_to_remove = ['ID', 'equity']
     cols_to_keep = rendement_cols + financial_features
     
     # Retirer les colonnes à exclure
@@ -187,5 +189,48 @@ def select_financial_and_rendements(X_train, X_test):
     
     print(f"Sélection de {len(cols_to_keep)} features ({len(rendement_cols)} rendements + {len(financial_features)} financières)")
     print(f"Features financières: {financial_features}")
+    
+    return X_train_selected, X_test_selected
+
+def select_optimized_features_no_day_equity(X_train_full, X_test_full):
+    """
+    Sélectionne les features optimisées sans day ni equity
+    """
+    # Ajouter les features financières
+    X_train_with_financial = add_financial_features(X_train_full)
+    X_test_with_financial = add_financial_features(X_test_full)
+    
+    # Colonnes à exclure
+    cols_to_exclude = ['day', 'equity', 'ID']
+    
+    # Identifier les rendements
+    rendement_cols = [col for col in X_train_with_financial.columns 
+                      if col.startswith('r') and col[1:].isdigit()]
+    
+    # Identifier les features financières importantes
+    financial_features = [
+        'pos_ratio', 
+        'neg_ratio',
+        'momentum',
+        'sharpe_ratio',
+        'volatility_20', 
+        'volatility_30',
+        'volatility_10',
+        'trend_slope'
+    ]
+    
+    # S'assurer que les features existent
+    financial_features = [f for f in financial_features 
+                          if f in X_train_with_financial.columns]
+    
+    # Combiner les colonnes
+    selected_cols = rendement_cols + financial_features
+    selected_cols = [col for col in selected_cols if col not in cols_to_exclude]
+    
+    X_train_selected = X_train_with_financial[selected_cols]
+    X_test_selected = X_test_with_financial[selected_cols]
+    
+    print(f"Sélection de {len(selected_cols)} features sans day ni equity")
+    print(f"Features financières: {', '.join(financial_features)}")
     
     return X_train_selected, X_test_selected
