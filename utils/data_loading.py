@@ -1,4 +1,5 @@
 from utils.data_registry import DATASETS
+from utils.feature_engineering import normalize_rendements_by_row
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,3 +68,47 @@ def load_datasets(strategies=['raw', 'ffbf', 'bfff', 'interp', 'mice']):
                 print(f"Erreur lors du chargement du dataset {key}: {e}")
     
     return datasets
+
+def load_dataset_for_analysis(dataset_key, normalize=False):
+    """
+    Charge un dataset du registre DATASETS pour l'analyse.
+    
+    Parameters:
+    -----------
+    dataset_key : str
+        Clé du dataset dans le registre
+    normalize : bool
+        Appliquer la normalisation par ligne
+        
+    Returns:
+    --------
+    tuple
+        (X_train, y_train, X_test, y_test)
+    """
+    # Vérifier si le dataset existe dans le registre
+    if dataset_key not in DATASETS:
+        raise ValueError(f"Dataset '{dataset_key}' non trouvé dans le registre.")
+    
+    # Charger le dataset
+    dataset_info = DATASETS[dataset_key]
+    X_train = pd.read_csv(dataset_info["train"])
+    X_test = pd.read_csv(dataset_info["test"])
+    
+    # Extraire les labels
+    y_train = X_train["reod"].copy()
+    y_test = X_test["reod"].copy()
+    
+    # Extraire les features (tout sauf ID et reod)
+    X_train_feat = X_train.drop(["ID", "reod"], axis=1, errors='ignore')
+    X_test_feat = X_test.drop(["ID", "reod"], axis=1, errors='ignore')
+    
+    # Appliquer normalisation si demandé
+    if normalize:
+        X_train_feat = normalize_rendements_by_row(X_train_feat)
+        X_test_feat = normalize_rendements_by_row(X_test_feat)
+    
+    # Gérer les valeurs manquantes
+    X_train_feat = X_train_feat.fillna(0)
+    X_test_feat = X_test_feat.fillna(0)
+    
+    return X_train_feat, y_train, X_test_feat, y_test
