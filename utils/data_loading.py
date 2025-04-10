@@ -112,3 +112,80 @@ def load_dataset_for_analysis(dataset_key, normalize=False):
     X_test_feat = X_test_feat.fillna(0)
     
     return X_train_feat, y_train, X_test_feat, y_test
+
+
+
+def load_dataset_without_day_id(dataset_key, normalize=False):
+    """
+    Charge un dataset sans les variables day et ID
+    
+    Parameters:
+    -----------
+    dataset_key : str
+        Clé du dataset dans DATASETS
+    normalize : bool
+        Appliquer normalisation par ligne
+        
+    Returns:
+    --------
+    tuple (X_train, y_train, X_test, y_test)
+    """
+    # Charger le dataset complet
+    X_train_full, y_train, X_test_full, y_test = load_dataset_for_analysis(dataset_key, normalize)
+    
+    # Retirer day et ID
+    cols_to_remove = ['day', 'ID']
+    X_train = X_train_full.drop(columns=[col for col in cols_to_remove if col in X_train_full.columns])
+    X_test = X_test_full.drop(columns=[col for col in cols_to_remove if col in X_test_full.columns])
+    
+    print(f"Données chargées sans day et ID - Dimensions: {X_train.shape}")
+    return X_train, y_train, X_test, y_test
+
+def select_financial_and_rendements(X_train, X_test):
+    """
+    Sélectionne toutes les features financières importantes et tous les rendements,
+    mais retire day et ID
+    
+    Parameters:
+    -----------
+    X_train, X_test : DataFrames
+        Données d'entraînement et de test
+        
+    Returns:
+    --------
+    X_train_selected, X_test_selected : DataFrames avec features sélectionnées
+    """
+    # Identifier les colonnes de rendement
+    rendement_cols = [col for col in X_train.columns if col.startswith('r') and col[1:].isdigit()]
+    
+    # Identifier les features financières importantes (basées sur l'analyse précédente)
+    financial_features = [
+        'equity',
+        'pos_ratio', 
+        'neg_ratio',
+        'momentum',
+        'sharpe_ratio',
+        'volatility_20', 
+        'volatility_30',
+        'volatility_10',
+        'trend_slope'
+    ]
+    
+    # Sélectionner les colonnes qui existent effectivement dans le DataFrame
+    financial_features = [f for f in financial_features if f in X_train.columns]
+    
+    # Colonnes à retirer (ID et day)
+    cols_to_remove = ['ID', 'day']
+    cols_to_keep = rendement_cols + financial_features
+    
+    # Retirer les colonnes à exclure
+    cols_to_keep = [col for col in cols_to_keep if col not in cols_to_remove]
+    
+    # Sélectionner les colonnes
+    X_train_selected = X_train[cols_to_keep]
+    X_test_selected = X_test[cols_to_keep]
+    
+    print(f"Sélection de {len(cols_to_keep)} features ({len(rendement_cols)} rendements + {len(financial_features)} financières)")
+    print(f"Features financières: {financial_features}")
+    
+    return X_train_selected, X_test_selected

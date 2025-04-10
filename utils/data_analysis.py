@@ -542,7 +542,7 @@ def perform_pca_analysis(dataset_key='raw', sample_size=10000):
             print(f"Composantes nécessaires pour {threshold*100}% de variance expliquée: {n_components}")
         
         # Visualiser la variance expliquée
-        plt.figure(figsize=(12, 8))
+        plt.figure(figsize=(18, 12))
         plt.subplot(2, 1, 1)
         plt.bar(range(1, len(explained_variance) + 1), explained_variance, alpha=0.7)
         plt.title('Variance expliquée par composante')
@@ -590,7 +590,7 @@ def perform_pca_analysis(dataset_key='raw', sample_size=10000):
         # Afficher les contributions des 10 premières composantes
         n_display = min(10, len(loadings))
         
-        plt.figure(figsize=(15, 12))
+        plt.figure(figsize=(15, 50))
         for i in range(n_display):
             plt.subplot(n_display, 1, i+1)
             plt.bar(range(len(rendement_cols)), loadings[i], alpha=0.7)
