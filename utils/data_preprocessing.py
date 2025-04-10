@@ -198,3 +198,47 @@ def normalize_rendements_by_row(df):
         df_normalized[rendement_cols] = normalized_rendements
     
     return df_normalized
+
+def create_low_nan_dataset(X_train, X_test, threshold=0.3):
+    """
+    Crée un nouveau dataset en gardant uniquement les colonnes avec moins de threshold% de NaN
+    
+    Parameters:
+    -----------
+    X_train : DataFrame
+        DataFrame d'entraînement
+    X_test : DataFrame
+        DataFrame de test
+    threshold : float
+        Seuil de pourcentage de NaN (default: 0.3)
+        
+    Returns:
+    --------
+    tuple
+        (X_train_filtered, X_test_filtered)
+    """
+    # Identifier les colonnes de rendement
+    rendement_cols = [col for col in X_train.columns if col.startswith('r') and col[1:].isdigit()]
+    
+    # Calculer le pourcentage de NaN pour chaque colonne
+    nan_percentages = X_train[rendement_cols].isna().mean()
+    
+    # Filtrer les colonnes avec moins de threshold% de NaN
+    valid_columns = nan_percentages[nan_percentages < threshold].index.tolist()
+    
+    # Ajouter les colonnes non-rendement
+    non_rendement_cols = [col for col in X_train.columns if col not in rendement_cols]
+    all_valid_columns = non_rendement_cols + valid_columns
+    
+    # Créer les datasets filtrés
+    X_train_filtered = X_train[all_valid_columns].copy()
+    X_test_filtered = X_test[all_valid_columns].copy()
+    
+    # Remplacer les NaN restants par 0
+    X_train_filtered = X_train_filtered.fillna(0)
+    X_test_filtered = X_test_filtered.fillna(0)
+    
+    print(f"Nombre de colonnes de rendement conservées: {len(valid_columns)} sur {len(rendement_cols)}")
+    print(f"Dimensions du dataset filtré: {X_train_filtered.shape}")
+    
+    return X_train_filtered, X_test_filtered

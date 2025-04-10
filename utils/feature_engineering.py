@@ -80,63 +80,69 @@ def add_features(df,features_sets = None):
 
 def add_financial_features(df):
     """
-    Ajoute des features financières avancées au dataframe.
+    Ajoute des features financières avancées au dataframe
+    
+    Parameters:
+    -----------
+    df : DataFrame
+        DataFrame contenant les rendements
+        
+    Returns:
+    --------
+    DataFrame
+        DataFrame enrichi avec les features financières
     """
-    result_df = df.copy(deep=True)
+    result_df = df.copy()
     
     # Identifier les colonnes de rendement
     r_cols = [col for col in df.columns if col.startswith('r') and col[1:].isdigit()]
     
-    if len(r_cols) == 0:
+    if not r_cols:
         print("Aucune colonne de rendement trouvée.")
         return result_df
     
-    # 1. Volatilité réalisée (sur différentes fenêtres)
-    for window in [5, 10, 20]:
-        if window < len(r_cols):
-            result_df[f"volatility_{window}"] = result_df[r_cols].apply(
-                lambda row: row.rolling(window=window).std().iloc[-1], axis=1)
+    # 1. Volatilité sur différentes fenêtres
+    for window in [10, 20, 30]:
+        if len(r_cols) >= window:
+            result_df[f'volatility_{window}'] = result_df[r_cols[:window]].std(axis=1)
     
-    # 2. Ratio de Sharpe simplifié (rendement / volatilité)
-    if 'r_mean' in result_df.columns and 'r_std' in result_df.columns:
-        result_df['sharpe_ratio'] = result_df['r_mean'] / (result_df['r_std'] + 1e-8)
+    # 2. Ratio Sharpe (approximation simplifiée)
+    if len(r_cols) >= 20:
+        returns_mean = result_df[r_cols[:20]].mean(axis=1)
+        returns_std = result_df[r_cols[:20]].std(axis=1)
+        result_df['sharpe_ratio'] = returns_mean / (returns_std + 1e-8)  # Éviter division par zéro
     
-    # 3. Skewness (asymétrie de la distribution des rendements)
-    result_df['r_skewness'] = result_df[r_cols].apply(
-        lambda row: row.skew(), axis=1)
+    # 3. Momentum (différence entre rendements récents et plus anciens)
+    if len(r_cols) >= 40:
+        recent_returns = result_df[r_cols[30:40]].mean(axis=1)
+        old_returns = result_df[r_cols[10:20]].mean(axis=1)
+        result_df['momentum'] = recent_returns - old_returns
     
-    # 4. Kurtosis (poids des extrêmes dans la distribution)
-    result_df['r_kurtosis'] = result_df[r_cols].apply(
-        lambda row: row.kurtosis(), axis=1)
+    # 4. Indicateur de tendance (pente des rendements)
+    if len(r_cols) >= 30:
+        x = np.arange(30)
+        for i in range(len(result_df)):
+            try:
+                returns = result_df.iloc[i][r_cols[:30]].values.astype(float)
+                if not np.isnan(returns).all():
+                    masked_returns = np.ma.masked_invalid(returns)
+                    masked_x = np.ma.array(x, mask=np.ma.getmask(masked_returns))
+                    if len(masked_returns.compressed()) > 1:
+                        slope, _ = np.ma.polyfit(masked_x.compressed(), masked_returns.compressed(), 1)
+                        result_df.loc[result_df.index[i], 'trend_slope'] = slope
+            except Exception:
+                pass
     
-    # 5. RSI (Relative Strength Index) sur les rendements
-    for window in [5, 14]:
-        if window < len(r_cols):
-            # Convertir en série pour utiliser rolling
-            def calculate_rsi(row, period=window):
-                prices = pd.Series(row.values)
-                deltas = prices.diff()
-                seed = deltas[:period+1]
-                up = seed[seed >= 0].sum() / period
-                down = -seed[seed < 0].sum() / period
-                rs = up / (down + 1e-8)
-                return 100 - (100 / (1 + rs))
-            
-            result_df[f'rsi_{window}'] = result_df[r_cols].apply(calculate_rsi, axis=1)
+    # 5. Ratio de rendements positifs/négatifs
+    result_df['pos_ratio'] = (result_df[r_cols] > 0).sum(axis=1) / len(r_cols)
+    result_df['neg_ratio'] = (result_df[r_cols] < 0).sum(axis=1) / len(r_cols)
     
-    # 6. MACD (Moving Average Convergence Divergence)
-    if len(r_cols) > 26:
-        def calculate_macd(row):
-            prices = pd.Series(row.values)
-            ema12 = prices.ewm(span=12, adjust=False).mean()
-            ema26 = prices.ewm(span=26, adjust=False).mean()
-            macd = ema12 - ema26
-            return macd.iloc[-1]
-        
-        result_df['macd'] = result_df[r_cols].apply(calculate_macd, axis=1)
+    # Remplir les NaN avec 0
+    for col in result_df.columns:
+        if col not in df.columns:
+            result_df[col] = result_df[col].fillna(0)
     
-    # 7. Ratio Nombre de rendements positifs / nombre de rendements négatifs
-    if 'r_pos_count' in result_df.columns and 'r_neg_count' in result_df.columns:
-        result_df['pos_neg_ratio'] = result_df['r_pos_count'] / (result_df['r_neg_count'] + 1e-8)
+    new_features = [col for col in result_df.columns if col not in df.columns]
+    print(f"Ajout de {len(new_features)} nouvelles features financières")
     
     return result_df
