@@ -172,29 +172,6 @@ def display_experiment_result(result):
     print(f"  Prediction: {result['pred_time']:.2f} seconds")
     print(f"  Total Time: {result['total_time']:.2f} seconds")
     
-    # Create a confusion matrix visualization
-    cm = np.array([
-        [result['report']['-1']['support'] * result['class_-1_recall'], 
-         result['report']['-1']['support'] * (1-result['class_-1_recall']) * result['class_0_recall'] / (result['class_0_recall'] + result['class_1_recall']),
-         result['report']['-1']['support'] * (1-result['class_-1_recall']) * result['class_1_recall'] / (result['class_0_recall'] + result['class_1_recall'])],
-        [result['report']['0']['support'] * (1-result['class_0_recall']) * result['class_-1_recall'] / (result['class_-1_recall'] + result['class_1_recall']),
-         result['report']['0']['support'] * result['class_0_recall'],
-         result['report']['0']['support'] * (1-result['class_0_recall']) * result['class_1_recall'] / (result['class_-1_recall'] + result['class_1_recall'])],
-        [result['report']['1']['support'] * (1-result['class_1_recall']) * result['class_-1_recall'] / (result['class_-1_recall'] + result['class_0_recall']),
-         result['report']['1']['support'] * (1-result['class_1_recall']) * result['class_0_recall'] / (result['class_-1_recall'] + result['class_0_recall']),
-         result['report']['1']['support'] * result['class_1_recall']]
-    ])        
-    # Normalize confusion matrix to show percentages
-    cm_normalized = cm / cm.sum(axis=1)[:, np.newaxis]
-    
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm_normalized, annot=True, fmt='.2%', cmap='Blues', 
-                xticklabels=['Predicted -1', 'Predicted 0', 'Predicted 1'],
-                yticklabels=['Actual -1', 'Actual 0', 'Actual 1'])
-    plt.title(f'Confusion Matrix - {result["model"]} on {result["dataset"]}')
-    plt.tight_layout()
-    plt.show()
-    
 def add_result(results_tracker, result):
     """Add a result to the results tracker DataFrame."""
     return pd.concat([results_tracker, pd.DataFrame([result])], ignore_index=True)

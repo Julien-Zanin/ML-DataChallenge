@@ -195,8 +195,8 @@ def compare_column_stats(datasets,rend_cols=None):
     plt.figure(figsize=(14, 7))
     
     # Sélectionner quelques colonnes représentatives
-    if rend_cols is not None : 
-        sample_cols = ['r0', 'r10', 'r25', 'r40', 'r52']
+    if rend_cols is  None : 
+        sample_cols = ['r0', 'r1', 'r2', 'r3','r4', 'r5','r6', 'r10', 'r25', 'r40','r50','r51', 'r52']
     else : 
         sample_cols = rend_cols
         

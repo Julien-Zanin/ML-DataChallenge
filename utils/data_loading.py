@@ -1,12 +1,12 @@
 from utils.data_registry import DATASETS
-from utils.feature_engineering import normalize_rendements_by_row
+from utils.data_preprocessing import normalize_rendements_by_row
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from time import time
 
-def load_datasets(strategies=['raw', 'ffbf', 'bfff', 'interp', 'mice']):
+def load_datasets(strategies=['raw', 'ffbf', 'bfff', 'interp', 'mice',"knn"]):
     """
     Charge directement les datasets préformés.
     

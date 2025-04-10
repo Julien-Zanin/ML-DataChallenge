@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.manifold import TSNE
 from utils.data_registry import DATASETS
-from utils.features import add_features
+from utils.feature_engineering import add_features
 
 from IPython.display import display
 
